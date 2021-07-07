@@ -1,0 +1,50 @@
+version: "2.4"
+
+services:
+  myor-db:
+    container_name: myor-db
+    image: openremote/postgresql:${POSTGRESQL_VERSION:-9.6.21.0}
+    restart: unless-stopped
+    volumes:
+      - myor-temp-data:/tmp
+
+  myor-auth:
+    container_name: myor-auth
+    depends_on:
+      myor-db:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_FRONTEND_URL: ${EXTERNAL_URL:-https://localhost}/auth
+      KEYCLOAK_PASSWORD: ${SETUP_ADMIN_PASSWORD:-secret}
+    image: openremote/keycloak:${KEYCLOAK_VERSION:-13.0.1.0}
+    restart: unless-stopped
+
+  myor-manager:
+    container_name: myor-manager
+    depends_on:
+      myor-auth:
+        condition: service_healthy
+    environment:
+      DEV_MODE: "${DEV_MODE:-false}"
+      SETUP_ADMIN_PASSWORD: ${SETUP_ADMIN_PASSWORD:-secret}
+    image: openremote/manager:${MANAGER_VERSION:-latest}
+    restart: unless-stopped
+    volumes:
+      - myor-temp-data:/tmp
+    # devices:
+    #   - /dev/ttyACM0:/dev/ttyS0
+
+  myor-proxy:
+    container_name: myor-proxy
+    depends_on:
+      myor-manager:
+        condition: service_healthy
+    image: openremote/proxy:${PROXY_VERSION:-2.1.2.3}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8883:8883"
+    restart: unless-stopped
+
+volumes:
+  myor-temp-data:
